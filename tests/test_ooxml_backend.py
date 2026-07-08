@@ -140,3 +140,11 @@ def test_revision_ids_unique(contract):
         for el in body.iter(qn("w:ins"), qn("w:del"))
     ]
     assert len(ids) == len(set(ids))
+
+
+def test_relative_path_rejected():
+    """MCP server 工作目录 ≠ 会话目录，相对路径必须被拒绝并引导 agent 纠正。"""
+    from word_agent_mcp.server import read_document
+
+    result = read_document("演示合同.docx")
+    assert "错误" in result and "绝对路径" in result

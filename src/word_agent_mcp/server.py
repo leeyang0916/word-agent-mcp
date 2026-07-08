@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
@@ -24,15 +25,27 @@ def _json(data) -> str:
     return json.dumps(data, ensure_ascii=False, indent=1)
 
 
+def _abs(path: str) -> str:
+    """要求绝对路径：MCP server 进程的工作目录与用户会话目录不同，
+    相对路径会解析到错误位置。报错信息引导 agent 自行纠正。"""
+    p = Path(path).expanduser()
+    if not p.is_absolute():
+        raise RevisionError(
+            f"必须传文档的绝对路径（收到 {path!r}）。"
+            f"请结合用户会话的工作目录拼出完整路径后重试"
+        )
+    return str(p)
+
+
 @mcp.tool()
 def read_document(path: str) -> str:
-    """读取 Word 文档（.docx）的全部段落。
+    """读取 Word 文档（.docx）的全部段落。path 必须是绝对路径。
 
     返回 JSON 数组，每段含 index（段落序号，编辑工具以此定位）、style（样式名）、
     text（接受全部现有修订后的有效文本）。编辑前必须先读取文档。
     """
     try:
-        doc = OoxmlBackend(path, backup=False)
+        doc = OoxmlBackend(_abs(path), backup=False)
         return _json(doc.get_paragraphs())
     except (RevisionError, OSError) as e:
         return f"错误: {e}"
@@ -54,7 +67,7 @@ def replace_text(
     new_text 传空字符串表示纯删除。
     """
     try:
-        doc = OoxmlBackend(path, author=author)
+        doc = OoxmlBackend(_abs(path), author=author)
         n = doc.replace_text(old_text, new_text, replace_all=replace_all)
         doc.save()
         return f"已以修订方式替换 {n} 处。用户可在 Word 审阅界面接受/拒绝。原文件备份为 {path}.bak"
@@ -75,7 +88,7 @@ def insert_paragraph(
     style 可选，填文档已有的段落样式名（如 "Heading 2"）。
     """
     try:
-        doc = OoxmlBackend(path, author=author)
+        doc = OoxmlBackend(_abs(path), author=author)
         doc.insert_paragraph_after(after_index, text, style=style)
         doc.save()
         return f"已在第 {after_index} 段后以修订方式插入新段落。"
@@ -87,7 +100,7 @@ def insert_paragraph(
 def delete_paragraph(path: str, index: int, author: str = DEFAULT_AUTHOR) -> str:
     """以修订方式删除第 index 段（从 0 计，见 read_document）。"""
     try:
-        doc = OoxmlBackend(path, author=author)
+        doc = OoxmlBackend(_abs(path), author=author)
         doc.delete_paragraph(index)
         doc.save()
         return f"已以修订方式删除第 {index} 段。"
@@ -102,7 +115,7 @@ def list_revisions(path: str) -> str:
     用于编辑后自检，或向用户汇报"本次共产生了哪些修订"。
     """
     try:
-        doc = OoxmlBackend(path, backup=False)
+        doc = OoxmlBackend(_abs(path), backup=False)
         return _json(doc.list_revisions())
     except (RevisionError, OSError) as e:
         return f"错误: {e}"
