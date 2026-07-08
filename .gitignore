@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+dist/
+*.egg-info/
+.pytest_cache/
+
+# demo 产物与文档备份
+examples/output/
+*.docx.bak
+
+# 编辑器/系统
+.DS_Store
+.idea/
+.vscode/
